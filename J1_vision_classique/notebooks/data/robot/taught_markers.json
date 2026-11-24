@@ -1,0 +1,25 @@
+{
+  "comment": "Tool pose [x, y, z] (mm, robot frame) read with robot.get_tool_pose() with the tool tip on the centre of each ArUco marker.",
+  "markers": {
+    "0": [
+      160.5,
+      -200.0,
+      -6.7
+    ],
+    "1": [
+      145.8,
+      199.4,
+      -6.6
+    ],
+    "2": [
+      426.1,
+      209.7,
+      -6.3
+    ],
+    "3": [
+      439.3,
+      -190.7,
+      -6.0
+    ]
+  }
+}

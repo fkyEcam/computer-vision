@@ -1,0 +1,11 @@
+# Day 3 — Transfer learning, detection, segmentation, generation (tested: Python 3.13, torch 2.10 CPU, ultralytics 8.4)
+# Labs 10-11 are meant for Google Colab (GPU); everything except Stable Diffusion also runs on a laptop CPU.
+torch
+torchvision
+ultralytics            # YOLO11 detection / segmentation (Lab 10)
+opencv-contrib-python<5  # ArUco (Lab 10)
+opencv-python<5          # required by ultralytics: without this line, pip installs OpenCV 5
+numpy
+matplotlib
+jupyterlab
+# Colab only (Lab 11 section 3, Lab 9 bonus): diffusers transformers accelerate

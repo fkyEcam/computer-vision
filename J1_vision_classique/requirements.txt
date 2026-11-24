@@ -1,0 +1,9 @@
+# Day 1 — Vision without AI (tested with Python 3.13, OpenCV 4.13, NumPy 2.4)
+numpy
+scipy
+matplotlib
+opencv-contrib-python<5   # contrib: needed for cv2.aruco
+jupyterlab
+ipywidgets              # sliders (Labs 1 and 3)
+ipympl                  # optional: clickable figures (Lab 3, INTERACTIVE = True)
+pyserial                # USB link to the Galatae robot arm (Lab 4, section 10)

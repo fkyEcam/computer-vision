@@ -1,0 +1,10 @@
+# Day 2 — Convolutional neural networks (tested with Python 3.13, PyTorch 2.10 CPU, torchvision 0.25)
+# Install PyTorch first following https://pytorch.org/get-started/locally/ (the CPU build is enough).
+torch
+torchvision
+numpy
+matplotlib
+opencv-contrib-python<5
+jupyterlab
+ipywidgets
+pyserial  # USB link to the Galatae robot arm (Lab 8, Part 4)
