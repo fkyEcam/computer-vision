@@ -22,8 +22,9 @@ PAGE = (210.0, 297.0)  # A4 portrait, mm
 MARKER, MARKER_TILE = 40.0, 60.0
 SHAPE, SHAPE_TILE = 30.0, 44.0
 COLOURS = {"red": (200, 40, 40), "blue": (30, 90, 190), "green": (50, 160, 60), "yellow": (230, 200, 40)}  # RGB
-LAYOUT = {0: (0, 0), 1: (400, 0), 2: (400, 280), 3: (0, 280)}  # marker centres, mm (MARKERS_LIVE of Lab 4)
-ROBOT_TO_EDGE = 160  # mm, from the axis of the robot base to the line through markers 0 and 1
+LENGTH, DEPTH = 340, 260  # mm, between the marker centres
+LAYOUT = {0: (0, 0), 1: (LENGTH, 0), 2: (LENGTH, DEPTH), 3: (0, DEPTH)}  # mm (MARKERS_LIVE of Labs 4 and 8)
+ROBOT_TO_EDGE = 230  # mm, from the axis of the robot base to the line through markers 0 and 1
 GREY = "0.45"
 OUT = Path(__file__).resolve().parent.parent / "notebooks" / "data" / "robot" / "robot_cell_cutouts_A4.pdf"
 
@@ -68,13 +69,14 @@ def layout_diagram(ax, x0, y0, scale):
         u, v = p(x, y)
         ax.add_patch(Rectangle((u - s / 2, v - s / 2), s, s, fc="white", ec="black", lw=0.8, zorder=2))
         ax.text(u, v, str(i), ha="center", va="center", fontsize=10, weight="bold", zorder=3)
-    u, v = p(200, -ROBOT_TO_EDGE)
+    mid = LENGTH / 2
+    u, v = p(mid, -ROBOT_TO_EDGE)
     ax.add_patch(Circle((u, v), 55 * scale, fc="0.8", ec="black", lw=0.8))
     ax.text(u + 130 * scale, v, "robot base\nz up, origin 120 mm\nabove the table", ha="left", va="center", fontsize=7.5)
     for (dx, dy), name in (((0, 105), "x"), ((105, 0), "y")):  # robot frame (z towards the reader)
-        ax.annotate("", p(200 + dx, -ROBOT_TO_EDGE + dy), p(200, -ROBOT_TO_EDGE), zorder=4,
+        ax.annotate("", p(mid + dx, -ROBOT_TO_EDGE + dy), p(mid, -ROBOT_TO_EDGE), zorder=4,
                     arrowprops=dict(arrowstyle="-|>", color="#D9534F", lw=1.6, shrinkA=0, shrinkB=0))
-        ax.text(*p(200 + dx * 1.02 + (10 if name == "x" else 4), -ROBOT_TO_EDGE + dy - (12 if name == "y" else 0)), name,
+        ax.text(*p(mid + dx * 1.02 + (10 if name == "x" else 4), -ROBOT_TO_EDGE + dy - (12 if name == "y" else 0)), name,
                 fontsize=9, weight="bold", color="#D9534F", va="center", zorder=4)
     arrow = dict(arrowstyle="<->", color="#003366", lw=0.9)
 
@@ -83,13 +85,13 @@ def layout_diagram(ax, x0, y0, scale):
         ax.text(*p((a[0] + b[0]) / 2 + kw.pop("dx", 0), (a[1] + b[1]) / 2 + kw.pop("dy", 0)), text,
                 fontsize=8, color="#003366", **kw)
 
-    dim((0, 335), (400, 335), "400 mm", dy=25, ha="center", va="center")
-    dim((455, 0), (455, 280), "280 mm", dx=12, ha="left", va="center")
-    dim((120, -ROBOT_TO_EDGE), (120, 0), f"{ROBOT_TO_EDGE} mm", dx=-10, ha="right", va="center")
-    ax.plot(*zip(p(110, -ROBOT_TO_EDGE), p(200, -ROBOT_TO_EDGE)), color="#003366", lw=0.5, ls=":")
+    dim((0, DEPTH + 55), (LENGTH, DEPTH + 55), f"{LENGTH} mm", dy=25, ha="center", va="center")
+    dim((LENGTH + 55, 0), (LENGTH + 55, DEPTH), f"{DEPTH} mm", dx=12, ha="left", va="center")
+    dim((mid - 80, -ROBOT_TO_EDGE), (mid - 80, 0), f"{ROBOT_TO_EDGE} mm", dx=-10, ha="right", va="center")
+    ax.plot(*zip(p(mid - 90, -ROBOT_TO_EDGE), p(mid, -ROBOT_TO_EDGE)), color="#003366", lw=0.5, ls=":")
     ax.annotate("", p(*LAYOUT[0]), p(*LAYOUT[2]), zorder=1.5,
                 arrowprops=dict(arrowstyle="-", color="#D9534F", lw=0.7, ls=":", shrinkA=0, shrinkB=0))
-    ax.text(*p(200, 190), "both diagonals: 488 mm", fontsize=8, color="#D9534F", ha="center", va="center", zorder=3,
+    ax.text(*p(mid, DEPTH * 0.68), f"both diagonals: {np.hypot(LENGTH, DEPTH):.0f} mm", fontsize=8, color="#D9534F", ha="center", va="center", zorder=3,
             bbox=dict(fc="0.96", ec="none", pad=1))
 
 
@@ -100,9 +102,9 @@ def make():
             marker_tile(ax, mid, 72 + 66 * (mid % 2), 254 - 66 * (mid // 2))
         ax.text(105, 152, "Where to put the markers (top view, distances between marker CENTRES)",
                 ha="center", fontsize=9, weight="bold")
-        layout_diagram(ax, 62, 104, 0.2)
+        layout_diagram(ax, 105 - 0.18 * LENGTH / 2, 96, 0.18)
         ax.text(15, 20, "Cut along the dashed lines (keep the white border). Marker 0 and 1 on the robot side, then "
-                        "clockwise seen from above.\nThe distances are entered in MARKERS_LIVE (Lab 4, section 10). "
+                        "clockwise seen from above.\nThe distances are entered in MARKERS_LIVE (Labs 4 and 8). "
                         "Tape the markers flat.", fontsize=7.5, va="center")
         pdf.savefig(fig)
         plt.close(fig)

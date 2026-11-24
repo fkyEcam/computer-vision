@@ -11,8 +11,8 @@ import math
 import sys
 
 # Marker centres (x, y) in the ROBOT frame, in mm. Default = placement plan of robot_cell_cutouts_A4.pdf
-# (base axis centred, 160 mm from the line 0-1). Replace them by the values read with get_tool_pose().
-MARKERS = {0: (160, -200), 1: (160, 200), 2: (440, 200), 3: (440, -200)}
+# (340 x 260 mm, base axis centred, 230 mm from the line 0-1). Replace them by the values read with get_tool_pose().
+MARKERS = {0: (230, -170), 1: (230, 170), 2: (490, 170), 3: (490, -170)}
 TABLE_Z = -120         # mm, the table in the robot frame
 Z_TRAVEL = TABLE_Z + 200  # moves between the markers: 200 mm above the table
 Z_POINT = TABLE_Z + 100   # above a marker: 100 mm above the table, lower it step by step

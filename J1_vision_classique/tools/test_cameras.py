@@ -23,7 +23,7 @@ import numpy as np  # noqa: E402
 
 W, H = 1280, 720                 # image size used in Labs 1, 4 and 8
 MIN_FPS = 10                     # comfortable preview for capture_calibration.py
-TABLE_MM = (440, 320)            # 400 x 280 mm between marker centres + the 40 mm markers
+TABLE_MM = (380, 300)            # 340 x 260 mm between marker centres + the 40 mm markers
 OTHER_SIZES = [(640, 480), (1920, 1080), (2592, 1944), (3840, 2160)]
 PATTERN = (9, 6)                 # inner corners of the checkerboard of Lab 4
 
