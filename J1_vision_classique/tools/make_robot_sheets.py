@@ -24,7 +24,7 @@ SHAPE, SHAPE_TILE = 30.0, 44.0
 COLOURS = {"red": (200, 40, 40), "blue": (30, 90, 190), "green": (50, 160, 60), "yellow": (230, 200, 40)}  # RGB
 LENGTH, DEPTH = 340, 260  # mm, between the marker centres
 LAYOUT = {0: (0, 0), 1: (LENGTH, 0), 2: (LENGTH, DEPTH), 3: (0, DEPTH)}  # mm (MARKERS_LIVE of Labs 4 and 8)
-ROBOT_TO_EDGE = 230  # mm, from the axis of the robot base to the line through markers 0 and 1
+ROBOT_TO_EDGE = 250  # mm, from the axis of the robot base to the line through markers 0 and 1
 GREY = "0.45"
 OUT = Path(__file__).resolve().parent.parent / "notebooks" / "data" / "robot" / "robot_cell_cutouts_A4.pdf"
 
@@ -102,7 +102,7 @@ def make():
             marker_tile(ax, mid, 72 + 66 * (mid % 2), 254 - 66 * (mid // 2))
         ax.text(105, 152, "Where to put the markers (top view, distances between marker CENTRES)",
                 ha="center", fontsize=9, weight="bold")
-        layout_diagram(ax, 105 - 0.18 * LENGTH / 2, 96, 0.18)
+        layout_diagram(ax, 105 - 0.18 * LENGTH / 2, 93, 0.18)
         ax.text(15, 20, "Cut along the dashed lines (keep the white border). Marker 0 and 1 on the robot side, then "
                         "clockwise seen from above.\nThe distances are entered in MARKERS_LIVE (Labs 4 and 8). "
                         "Tape the markers flat.", fontsize=7.5, va="center")
