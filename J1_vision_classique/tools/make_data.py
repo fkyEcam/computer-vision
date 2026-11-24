@@ -222,13 +222,15 @@ def make_table_set():
 # 3. Robot cell: a red circle among the 4 ArUco markers, and a simulated robot (L4, section 8)
 # ----------------------------------------------------------------------------
 # Same camera and table as section 2. The robot (Galatae Gal-e) stands at the top edge of the
-# table. Table frame: X right, Y "down" in the image, Z into the table. Robot frame: z up.
+# table. Table frame: X right, Y "down" in the image, Z into the table. Robot frame
+# (right-handed), seen by somebody facing the robot: x towards the viewer, y to the right, z up, origin
+# 120 mm above the table.
 # Table -> robot:  [x_r, y_r] = M [X, Y] + o,  z_r = Z_TABLE_ROBOT - Z   (M = rotation x swap, det -1)
 ROBOT_THETA = 2.0  # deg: the robot is not perfectly aligned with the table
 _c, _s = np.cos(np.deg2rad(ROBOT_THETA)), np.sin(np.deg2rad(ROBOT_THETA))
 ROBOT_M = np.array([[_c, -_s], [_s, _c]]) @ np.array([[0.0, 1.0], [1.0, 0.0]])
 ROBOT_O = np.array([160.0, -200.0])  # robot coordinates of the table origin (marker 0), mm
-Z_TABLE_ROBOT = -6.5  # height of the table surface in the robot frame, mm
+Z_TABLE_ROBOT = -120.0  # height of the table surface in the robot frame, mm
 CIRCLE_RADIUS = 15.0  # mm (red sticker, diameter 30 mm)
 ROBOT_SCENES = [  # red circle centre (mm, table frame) + distractors
     {"circle": (255.0, 175.0),

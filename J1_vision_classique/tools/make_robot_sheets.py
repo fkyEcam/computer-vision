@@ -70,7 +70,12 @@ def layout_diagram(ax, x0, y0, scale):
         ax.text(u, v, str(i), ha="center", va="center", fontsize=10, weight="bold", zorder=3)
     u, v = p(200, -ROBOT_TO_EDGE)
     ax.add_patch(Circle((u, v), 55 * scale, fc="0.8", ec="black", lw=0.8))
-    ax.text(u + 60 * scale, v, "robot base", ha="left", va="center", fontsize=8)
+    ax.text(u + 130 * scale, v, "robot base\nz up, origin 120 mm\nabove the table", ha="left", va="center", fontsize=7.5)
+    for (dx, dy), name in (((0, 105), "x"), ((105, 0), "y")):  # robot frame (z towards the reader)
+        ax.annotate("", p(200 + dx, -ROBOT_TO_EDGE + dy), p(200, -ROBOT_TO_EDGE), zorder=4,
+                    arrowprops=dict(arrowstyle="-|>", color="#D9534F", lw=1.6, shrinkA=0, shrinkB=0))
+        ax.text(*p(200 + dx * 1.02 + (10 if name == "x" else 4), -ROBOT_TO_EDGE + dy - (12 if name == "y" else 0)), name,
+                fontsize=9, weight="bold", color="#D9534F", va="center", zorder=4)
     arrow = dict(arrowstyle="<->", color="#003366", lw=0.9)
 
     def dim(a, b, text, **kw):
@@ -80,7 +85,8 @@ def layout_diagram(ax, x0, y0, scale):
 
     dim((0, 335), (400, 335), "400 mm", dy=25, ha="center", va="center")
     dim((455, 0), (455, 280), "280 mm", dx=12, ha="left", va="center")
-    dim((200, -ROBOT_TO_EDGE), (200, 0), f"{ROBOT_TO_EDGE} mm", dx=-10, dy=20, ha="right", va="center")
+    dim((120, -ROBOT_TO_EDGE), (120, 0), f"{ROBOT_TO_EDGE} mm", dx=-10, ha="right", va="center")
+    ax.plot(*zip(p(110, -ROBOT_TO_EDGE), p(200, -ROBOT_TO_EDGE)), color="#003366", lw=0.5, ls=":")
     ax.annotate("", p(*LAYOUT[0]), p(*LAYOUT[2]), zorder=1.5,
                 arrowprops=dict(arrowstyle="-", color="#D9534F", lw=0.7, ls=":", shrinkA=0, shrinkB=0))
     ax.text(*p(200, 190), "both diagonals: 488 mm", fontsize=8, color="#D9534F", ha="center", va="center", zorder=3,

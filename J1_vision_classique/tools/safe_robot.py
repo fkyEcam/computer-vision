@@ -30,8 +30,9 @@ import signal
 import threading
 import time
 
-LIFT_Z = 150.0     # mm (robot frame): the tool is lifted to this height before folding
-MIN_REACH = 120.0  # mm: closer to the base than this, the arm is already (almost) folded: no lift
+TABLE_Z = -120.0            # mm: the origin of the robot frame is 120 mm above the table
+LIFT_Z = TABLE_Z + 200.0    # mm (robot frame): the tool is lifted to this height before folding
+MIN_REACH = 120.0           # mm: closer to the base than this, the arm is already (almost) folded: no lift
 MOVES = {"go_to_pose", "jog", "linear_move_to_pose", "probe", "home", "calibrate"}
 
 
