@@ -3,7 +3,8 @@
     python visit_markers.py          # dry run: checks and prints the poses, nothing moves
     python visit_markers.py --run    # moves the real arm (put it in its REST position first!)
 
-robot.py (galatae-api) must be in the same folder; it is already installed on the control box.
+robot.py (galatae-api) and safe_robot.py must be in the same folder; robot.py is already on the control box.
+Ctrl+C or closing the window brings the arm back to its rest position (see safe_robot.py).
 """
 import math
 import sys
@@ -40,17 +41,19 @@ if "--run" not in sys.argv:
     sys.exit()
 
 from robot import Robot  # noqa: E402
+from safe_robot import SafeRobot  # noqa: E402
 
 input("Arm in REST position, cell clear, hand near the emergency stop? Enter to start (Ctrl+C to cancel)")
-r = Robot()
-r.reset()
-r.home()
-r.set_joint_speed(SPEED)
-for text, pose in steps:
-    print(f"{text:20s} {pose}")
-    r.go_to_pose(pose)
-    if text.startswith("point"):
-        print("   tool pose:", r.get_tool_pose())
-        input("   Enter to continue")
-r.go_to_sleep_pos()
-r.disable_motors()
+try:
+    with SafeRobot(Robot()) as r:  # always ends in the rest position
+        r.reset()
+        r.home()
+        r.set_joint_speed(SPEED)
+        for text, pose in steps:
+            print(f"{text:20s} {pose}")
+            r.go_to_pose(pose)
+            if text.startswith("point"):
+                print("   tool pose:", r.get_tool_pose())
+                input("   Enter to continue")
+except KeyboardInterrupt:
+    print("Interrupted.")
