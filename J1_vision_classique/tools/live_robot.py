@@ -2,7 +2,7 @@
 
     python live_robot.py
 
-Nothing else to prepare: the program does not need the notebook of Lab 4.
+The views (cell_calib) and the calibration (cell_calibration.yaml) are saved next to this program.
 
 Everything happens in the video window, in 4 steps. Each step is a CHECKPOINT: the result is shown on the
 video and in the terminal, and nothing goes on before you press ENTER (BACKSPACE: previous step, q/ESC: quit).
@@ -33,8 +33,6 @@ from camera import DEFAULT_CAMERA, open_camera
 from safe_robot import SafeRobot
 
 HERE = Path(__file__).resolve().parent
-NOTEBOOKS = HERE.parent / "notebooks"
-OUT = NOTEBOOKS if NOTEBOOKS.is_dir() else HERE
 
 # ---- the real cell (placement plan of robot_cell_cutouts_A4.pdf), in mm ---------------------------------
 MARKERS = {0: (0.0, 0.0), 1: (340.0, 0.0), 2: (340.0, 260.0), 3: (0.0, 260.0)}  # centres on the board
@@ -46,11 +44,13 @@ SPEED = 20             # deg/s
 REACH = (120.0, 550.0)  # allowed distance from the base axis
 SHAPE_MM = 30.0        # diameter of the circles, side of the squares
 
+MIN_S = 70  # minimum saturation (0-255): lower it if the room is bright, raise it if the table or the paper is detected
+SQUARE_FILL = 0.84  # part of the bounding square that is filled: disc 0.79, square 1 (less with noisy edges)
 # HSV ranges of the printed colours (OpenCV: H in 0..179): adapt them to your lighting
-COLOURS = {"red": [((0, 120, 60), (10, 255, 255)), ((170, 120, 60), (179, 255, 255))],
-           "blue": [((100, 100, 50), (130, 255, 255))],
-           "green": [((40, 80, 40), (85, 255, 255))],
-           "yellow": [((18, 100, 80), (36, 255, 255))]}
+COLOURS = {"red": [((0, MIN_S, 60), (10, 255, 255)), ((170, MIN_S, 60), (179, 255, 255))],
+           "blue": [((100, MIN_S, 50), (130, 255, 255))],
+           "green": [((40, MIN_S, 40), (85, 255, 255))],
+           "yellow": [((18, MIN_S, 80), (36, 255, 255))]}
 BGR = {"red": (0, 0, 255), "blue": (255, 80, 0), "green": (0, 180, 0), "yellow": (0, 220, 255)}
 ENTER, BACKSPACE, SPACE, ESC, NO_KEY = (10, 13), (8, 127), ord(" "), 27, 255
 DIGITS = {**{ord(str(n)): n for n in range(1, 10)},   # 1-9, and the same keys of an AZERTY keyboard without Shift
@@ -204,7 +204,7 @@ def find_shapes(frame, board):
             if not (0 <= XY[0] <= MARKERS[2][0] and 0 <= XY[1] <= MARKERS[2][1]):
                 continue  # not between the markers
             extent = area / (sides[0] * sides[1])  # part of the bounding square that is filled: pi/4 for a disc
-            shapes.append({"colour": colour, "shape": "circle" if extent < 0.89 else "square", "uv": uv, "XY": XY,
+            shapes.append({"colour": colour, "shape": "circle" if extent < SQUARE_FILL else "square", "uv": uv, "XY": XY,
                            "error": abs(np.mean(sides) - SHAPE_MM)})
     return shapes
 
@@ -533,8 +533,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--camera", type=int, default=DEFAULT_CAMERA, help=f"camera index (default {DEFAULT_CAMERA})")
     ap.add_argument("--hover", type=float, default=HOVER, help=f"height above the table, mm (default {HOVER:.0f})")
-    ap.add_argument("--views", default=str(OUT / "cell_calib"), help="folder of the checkerboard views")
-    ap.add_argument("--calibration", default=str(OUT / "cell_calibration.yaml"), help="calibration file")
+    ap.add_argument("--views", default=str(HERE / "cell_calib"), help="folder of the checkerboard views")
+    ap.add_argument("--calibration", default=str(HERE / "cell_calibration.yaml"), help="calibration file")
     ap.add_argument("--pattern", type=int, nargs=2, default=(9, 6), help="inner corners of the checkerboard")
     ap.add_argument("--square", type=float, default=25.0, help="side of the squares (mm)")
     args = ap.parse_args()
