@@ -47,10 +47,10 @@ SHAPE_MM = 30.0        # diameter of the circles, side of the squares
 MIN_S = 70  # minimum saturation (0-255): lower it if the room is bright, raise it if the table or the paper is detected
 SQUARE_FILL = 0.84  # part of the bounding square that is filled: disc 0.79, square 1 (less with noisy edges)
 # HSV ranges of the printed colours (OpenCV: H in 0..179): adapt them to your lighting
-COLOURS = {"red": [((0, MIN_S, 60), (10, 255, 255)), ((170, MIN_S, 60), (179, 255, 255))],
+COLOURS = {"red": [((0, MIN_S, 60), (15, 255, 255)), ((165, MIN_S, 60), (179, 255, 255))],
            "blue": [((100, MIN_S, 50), (130, 255, 255))],
            "green": [((40, MIN_S, 40), (85, 255, 255))],
-           "yellow": [((18, MIN_S, 80), (36, 255, 255))]}
+           "yellow": [((15, MIN_S, 80), (36, 255, 255))]}
 BGR = {"red": (0, 0, 255), "blue": (255, 80, 0), "green": (0, 180, 0), "yellow": (0, 220, 255)}
 ENTER, BACKSPACE, SPACE, ESC, NO_KEY = (10, 13), (8, 127), ord(" "), 27, 255
 DIGITS = {**{ord(str(n)): n for n in range(1, 10)},   # 1-9, and the same keys of an AZERTY keyboard without Shift
