@@ -18,21 +18,19 @@ video and in the terminal, and nothing goes on before you press ENTER (BACKSPACE
                 then any key folds the arm and goes back to step 3
 
 Ctrl+C, an error or a closed window brings the arm back to its rest position (safe_robot.py).
-robot.py (Python API of the arm, GPL-3.0, https://github.com/galatae-engineering/galatae-api) is downloaded
-the first time the arm is connected, if it is not installed.
+The Python API of the arm (robot.py, https://github.com/galatae-engineering/galatae-api) must be installed.
 """
 import argparse
 import contextlib
-import importlib.util
-import sys
 import threading
-import urllib.request
 from pathlib import Path
 
 import cv2
 import numpy as np
+from robot import Robot
 
 from camera import DEFAULT_CAMERA, open_camera
+from safe_robot import SafeRobot
 
 HERE = Path(__file__).resolve().parent
 NOTEBOOKS = HERE.parent / "notebooks"
@@ -46,7 +44,6 @@ HOVER = 60.0           # height above the table when pointing at the object: sta
 SAFE = 150.0           # height above the table for the approach and the retreat
 SPEED = 20             # deg/s
 REACH = (120.0, 550.0)  # allowed distance from the base axis
-ROBOT_PY = "https://raw.githubusercontent.com/galatae-engineering/galatae-api/main/robot.py"
 SHAPE_MM = 30.0        # diameter of the circles, side of the squares
 
 # HSV ranges of the printed colours (OpenCV: H in 0..179): adapt them to your lighting
@@ -102,25 +99,29 @@ def load_calibration(path):
     return Calibration(K, dist, size, rms)
 
 
-def calibrate(folder, pattern, square, out):
-    """Images of the checkerboard -> Calibration, saved in the file out. ValueError if it is not possible."""
+def calibrate(folder, pattern, square, out, size):
+    """Images of the checkerboard -> Calibration, saved in the file out. ValueError if it is not possible.
+
+    Only the images of the given size (width, height) are used: K is only valid for one size."""
     files = sorted(Path(folder).glob("*.png"))
     if not files:
         raise ValueError(f"no .png image in {Path(folder).resolve()}")
     objp = np.zeros((pattern[0] * pattern[1], 3), np.float32)
     objp[:, :2] = np.mgrid[0:pattern[0], 0:pattern[1]].T.reshape(-1, 2) * square
-    size = cv2.imread(str(files[0]), cv2.IMREAD_GRAYSCALE).shape[::-1]
-    points, used = [], []
+    points, used, others = [], [], []
     for f in files:
         gray = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
         if gray.shape[::-1] != size:
-            raise ValueError(f"{f.name} does not have the same size as the other images")
+            others.append(f"{f.name} {gray.shape[1]}x{gray.shape[0]}")
+            continue
         found, c = cv2.findChessboardCorners(gray, pattern)
         if found:
             points.append(cv2.cornerSubPix(gray, c, (11, 11), (-1, -1), (3, 30, 1e-3)))
             used.append(f.name)
+    if others:
+        log(f"  ignored, not {size[0]}x{size[1]} like the video: {', '.join(others)}")
     if len(points) < 5:
-        raise ValueError(f"checkerboard found in only {len(points)} of {len(files)} images (5 needed, 15-25 advised)")
+        raise ValueError(f"{len(points)} usable views of {size[0]}x{size[1]} out of {len(files)} (5 needed, 15-25 advised)")
     rms, K, dist, *_, per_view = cv2.calibrateCameraExtended([objp] * len(points), points, size, None, None)
     for name, e in zip(used, per_view.ravel()):
         log(f"  {name}: {e:.2f} px" + ("   <- bad view: delete it and calibrate again" if e > 1 else ""))
@@ -277,7 +278,20 @@ class App:
         self.frozen = None            # picture of the frozen target
         self.target = None            # (x, y) in the robot frame
         self.arm, self.motion = None, None
+        self.check_size()
         self.enter("intrinsics")
+
+    def check_size(self):
+        """Show the size of the video; if the calibration has another size, ask the camera for that size."""
+        size = self.cap.read()[1].shape[1::-1]
+        if self.calib is not None and self.calib.size != size and min(self.calib.size) > 0:
+            log(f"the calibration is for {self.calib.size}, the camera gives {size}: asking for {self.calib.size}")
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.calib.size[0])
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.calib.size[1])
+            for _ in range(5):
+                ok, frame = self.cap.read()
+            size = frame.shape[1::-1] if ok else size
+        log(f"camera {self.args.camera}: {size[0]} x {size[1]}, opened with {self.cap.getBackendName()}, OpenCV {cv2.__version__}")
 
     def enter(self, step):
         self.step, self.message = step, ""
@@ -300,6 +314,8 @@ class App:
         n = len(list(self.views.glob("*.png"))) if self.views.is_dir() else 0
         size = frame.shape[1::-1]
         valid = self.calib is not None and self.calib.size == size
+        mismatch = "" if valid or self.calib is None else \
+            f"calibrated in {self.calib.size[0]}x{self.calib.size[1]}, but the video is {size[0]}x{size[1]}: c = new views, k = calibrate"
         if key == ord("c"):
             if found:
                 self.views.mkdir(parents=True, exist_ok=True)
@@ -310,26 +326,28 @@ class App:
                 self.say("checkerboard not found: view not saved")
         elif key == ord("k"):
             try:
-                self.calib = calibrate(self.views, self.args.pattern, self.args.square, self.args.calibration)
+                self.calib = calibrate(self.views, self.args.pattern, self.args.square, self.args.calibration, size)
+                valid, mismatch = True, ""
                 self.say("calibrated: check the RMS and the undistorted video (u)")
                 log("\n".join(self.calib.report()))
             except (ValueError, cv2.error) as e:
                 self.say(f"calibration not possible: {e}")
         elif key == ord("u"):
-            self.undistort = not self.undistort
+            self.undistort = valid and not self.undistort
+            if not valid:
+                self.say(mismatch or "not calibrated: c = save views, k = calibrate")
         elif key in ENTER:
             if valid:
                 self.undistort = False
                 return self.enter("camera")
-            self.say("no valid calibration: c = save views, k = calibrate")
-        if self.undistort and self.calib is not None and self.calib.size == size:
+            self.say(mismatch or "not calibrated: c = save views, k = calibrate")
+        if self.undistort and valid:
             frame = cv2.undistort(frame, self.calib.K, self.calib.dist)
         elif found:
             cv2.drawChessboardCorners(frame, self.args.pattern, corners, found)
         lines = ["1 INTRINSICS" + ("  (undistorted video)" if self.undistort else "")]
         lines += self.calib.report() if self.calib else ["not calibrated"]
-        if self.calib is not None and not valid:
-            lines.append(f"calibrated in {self.calib.size}, but the camera gives {size}: calibrate again")
+        lines.append(f"video {size[0]}x{size[1]}" if valid or self.calib is None else mismatch)
         write(frame, lines, [self.message, f"{n} views   c: save view   k: calibrate   u: undistort   ENTER: validate   q: quit"])
         return frame
 
@@ -441,23 +459,8 @@ class App:
         return frame
 
     def connect(self):
-        sys.path.append(str(Path.cwd()))
-        try:
-            if importlib.util.find_spec("robot") is None:
-                log(f"downloading robot.py in {HERE}")
-                urllib.request.urlretrieve(ROBOT_PY, HERE / "robot.py")
-                importlib.invalidate_caches()
-            from robot import Robot
-        except (ImportError, OSError) as e:
-            return self.say(f"robot.py cannot be loaded ({e}): pip install pyserial, internet connection?")
-        from safe_robot import SafeRobot
-
         log("connecting the arm...")
-        galatae = Robot()
-        if self.args.port:
-            import serial
-            galatae.arduino = serial.Serial(port=self.args.port, baudrate=115200, timeout=0.1)
-        self.arm = self.exits.enter_context(SafeRobot(galatae))  # always ends in the rest position
+        self.arm = self.exits.enter_context(SafeRobot(Robot()))  # always ends in the rest position
         self.exits.callback(wait_for_motion, self.arm)           # (runs before the return to rest)
         self.step, self.motion = "homing", Motion(lambda: prepare(self.arm))
 
@@ -500,7 +503,6 @@ class App:
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--camera", type=int, default=DEFAULT_CAMERA, help=f"camera index (default {DEFAULT_CAMERA})")
-    ap.add_argument("--port", help="serial port of the arm (e.g. COM5), if it is not found automatically")
     ap.add_argument("--hover", type=float, default=HOVER, help=f"height above the table, mm (default {HOVER:.0f})")
     ap.add_argument("--views", default=str(OUT / "cell_calib"), help="folder of the checkerboard views")
     ap.add_argument("--calibration", default=str(OUT / "cell_calibration.yaml"), help="calibration file")
