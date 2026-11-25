@@ -10,12 +10,12 @@ video and in the terminal, and nothing goes on before you press ENTER (BACKSPACE
   1 INTRINSICS  K and distortion of the camera.   c: save a view of the checkerboard   k: calibrate
                                                   u: show the undistorted video
   2 CAMERA      position of the camera in the robot frame (the 4 markers must be visible)
-  3 OBJECT      1 red circle   3 blue circle   5 green circle   7 yellow circle
-                2 red square   4 blue square   6 green square   8 yellow square
-                the robot axes (x red, y green, z blue) and the coordinates are drawn on the chosen object;
-                ENTER freezes the picture and the target
-  4 ROBOT       r: connect the arm and home it (arm in its REST position!)   SPACE: go above the target
+  3 OBJECTS     the coloured circles and squares found on the board; ENTER freezes the picture
+  4 ROBOT       on the frozen picture, every object has a number.
+                1-9: choose an object: the robot axes (x red, y green, z blue) and its coordinates are drawn
+                r: connect the arm and home it (arm in its REST position!)   SPACE: go above the chosen object
                 then any key folds the arm and goes back to step 3
+                (the unshifted digit keys of an AZERTY keyboard work too)
 
 Ctrl+C, an error or a closed window brings the arm back to its rest position (safe_robot.py).
 The Python API of the arm (robot.py, https://github.com/galatae-engineering/galatae-api) must be installed.
@@ -51,9 +51,10 @@ COLOURS = {"red": [((0, 120, 60), (10, 255, 255)), ((170, 120, 60), (179, 255, 2
            "blue": [((100, 100, 50), (130, 255, 255))],
            "green": [((40, 80, 40), (85, 255, 255))],
            "yellow": [((18, 100, 80), (36, 255, 255))]}
-OBJECTS = [(c, s) for c in COLOURS for s in ("circle", "square")]  # keys 1 to 8
 BGR = {"red": (0, 0, 255), "blue": (255, 80, 0), "green": (0, 180, 0), "yellow": (0, 220, 255)}
 ENTER, BACKSPACE, SPACE, ESC, NO_KEY = (10, 13), (8, 127), ord(" "), 27, 255
+DIGITS = {**{ord(str(n)): n for n in range(1, 10)},   # 1-9, and the same keys of an AZERTY keyboard without Shift
+          **{ord(c): n for n, c in enumerate("&\u00e9\"'(\u00a7\u00e8!\u00e7", 1)}, ord("-"): 6, ord("_"): 8}
 
 # Robot frame, facing the robot: x towards you, y to your right, z up. The board is centred in front of the
 # base and not rotated: board Y -> robot x, board X -> robot y.
@@ -185,8 +186,8 @@ class Board:
 
 
 def find_shapes(frame, board):
-    """All the coloured shapes on the board: {(colour, shape): [(u, v), ...]}. They are measured in mm."""
-    hsv, shapes = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), {}
+    """The coloured shapes between the markers: list of dicts (colour, shape, uv in px, XY on the board in mm)."""
+    hsv, shapes = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), []
     for colour, ranges in COLOURS.items():
         mask = sum(cv2.inRange(hsv, np.array(lo), np.array(hi)) for lo, hi in ranges)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
@@ -197,11 +198,30 @@ def find_shapes(frame, board):
             (_, sides, _), area = cv2.minAreaRect(mm), cv2.contourArea(mm)
             if not all(0.75 * SHAPE_MM < s < 1.25 * SHAPE_MM for s in sides):
                 continue  # not the size of our shapes
-            extent = area / (sides[0] * sides[1])  # part of the bounding square that is filled: pi/4 for a disc
             m = cv2.moments(c)
-            shapes.setdefault((colour, "circle" if extent < 0.89 else "square"), []).append(
-                (m["m10"] / m["m00"], m["m01"] / m["m00"]))
+            uv = np.array([m["m10"] / m["m00"], m["m01"] / m["m00"]])
+            XY = board.to_mm(uv)[0]
+            if not (0 <= XY[0] <= MARKERS[2][0] and 0 <= XY[1] <= MARKERS[2][1]):
+                continue  # not between the markers
+            extent = area / (sides[0] * sides[1])  # part of the bounding square that is filled: pi/4 for a disc
+            shapes.append({"colour": colour, "shape": "circle" if extent < 0.89 else "square", "uv": uv, "XY": XY,
+                           "error": abs(np.mean(sides) - SHAPE_MM)})
     return shapes
+
+
+def stable(shapes, history, seen=4):
+    """The shapes also found (same colour and shape, less than 8 mm away) in at least `seen` previous pictures."""
+    def same(a, b):
+        return a["colour"] == b["colour"] and a["shape"] == b["shape"] and np.linalg.norm(a["XY"] - b["XY"]) < 8
+    return [a for a in shapes if sum(any(same(a, b) for b in old) for old in history) >= seen]
+
+
+def label(frame, item, number=None, chosen=False):
+    u, v = (int(round(c)) for c in item["uv"])
+    text = f"{item['colour']} {item['shape']}" + (f"  [{number}]" if number else "")
+    cv2.circle(frame, (u, v), 4, BGR[item["colour"]], -1)
+    for colour, thick in (((0, 0, 0), 5), ((255, 255, 255) if chosen else BGR[item["colour"]], 2)):
+        cv2.putText(frame, text, (u + 18, v - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.65, colour, thick, cv2.LINE_AA)
 
 
 def write(frame, lines, bottom=()):
@@ -274,9 +294,9 @@ class App:
         self.views = Path(args.views)
         self.undistort, self.message = False, ""
         self.camera = None            # validated position of the camera (robot frame)
-        self.choice = 0               # index in OBJECTS
-        self.frozen = None            # picture of the frozen target
-        self.target = None            # (x, y) in the robot frame
+        self.history = []             # shapes found in the previous pictures
+        self.frozen = None            # frozen picture, its board and its numbered objects
+        self.choice = None            # index of the chosen object
         self.arm, self.motion = None, None
         self.check_size()
         self.enter("intrinsics")
@@ -296,7 +316,7 @@ class App:
     def enter(self, step):
         self.step, self.message = step, ""
         title = {"intrinsics": "STEP 1 - INTRINSICS", "camera": "STEP 2 - CAMERA IN THE ROBOT FRAME",
-                 "object": "STEP 3 - OBJECT", "robot": "STEP 4 - ROBOT"}.get(step)
+                 "object": "STEP 3 - OBJECTS", "robot": "STEP 4 - ROBOT"}.get(step)
         if title:
             log(f"\n=== {title} " + "=" * (60 - len(title)))
         if step == "intrinsics":
@@ -384,15 +404,11 @@ class App:
     # ---- step 3
     def objects(self, frame, key):
         raw = frame.copy()
-        if ord("1") <= key <= ord("8"):
-            self.choice = key - ord("1")
-            log(f"looking for: {' '.join(OBJECTS[self.choice])}")
         if key in BACKSPACE:
             return self.enter("camera")
-        colour, shape = OBJECTS[self.choice]
         board = Board(raw, self.calib, self.detector)
         board.draw_markers(frame)
-        lines, target = [f"3 OBJECT: {colour} {shape}"], None
+        lines, items = ["3 OBJECTS"], []
         if board.missing:
             lines.append(f"markers not visible: {board.missing}")
         else:
@@ -400,62 +416,75 @@ class App:
             if moved > 15:
                 lines.append(f"the camera has moved by {moved:.0f} mm: BACKSPACE and check step 2")
             shapes = find_shapes(raw, board)
-            for (c, s), centres in shapes.items():
-                for u, v in centres:
-                    cv2.circle(frame, (int(u), int(v)), 4, BGR[c], -1)
-                    cv2.putText(frame, f"{c} {s}", (int(u) + 18, int(v) - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.55, BGR[c], 2,
-                                cv2.LINE_AA)
-            centres = shapes.get((colour, shape), [])
-            if len(centres) != 1:
-                lines.append(f"{len(centres)} found: exactly one is needed" + ("" if centres else " (lighting? COLOURS?)"))
-            else:
-                uv = centres[0]
-                X, Y = board.to_mm(uv)[0]
-                x, y, _ = board_to_robot([[X, Y, 0]])[0]
-                board.draw_axes(frame, (x, y, TABLE_Z))
-                lines += [f"pixel ({uv[0]:.0f}, {uv[1]:.0f})   board X = {X:.0f}  Y = {Y:.0f} mm",
-                          f"robot x = {x:.0f}  y = {y:.0f}  z = {TABLE_Z:.0f} mm"]
-                if not (0 <= X <= MARKERS[2][0] and 0 <= Y <= MARKERS[2][1]):
-                    lines.append("outside the 4 markers: the arm will not go there")
-                elif not REACH[0] <= np.hypot(x, y) <= REACH[1]:
-                    lines.append(f"out of reach: {np.hypot(x, y):.0f} mm from the base")
-                else:
-                    target = np.array([x, y])
+            items = stable(shapes, self.history)  # the noise does not stay several pictures at the same place
+            self.history = [*self.history, shapes][-6:]
+            lines.append(f"{len(items)} objects" + ("" if items else " (lighting? thresholds COLOURS?)"))
+        for item in items:
+            label(frame, item)
         if key in ENTER:
-            if target is None:
-                self.say("no valid target")
+            if not items:
+                self.say("nothing to freeze: the 4 markers and at least one object must be visible")
             else:
-                self.target, self.name = target, f"{colour} {shape}"
-                log(f"{self.name}: {lines[-2]}   {lines[-1]}")
+                items = sorted(sorted(items, key=lambda s: s["error"])[:9],  # 9 keys: keep the best sizes
+                               key=lambda s: (list(COLOURS).index(s["colour"]), s["shape"], s["XY"][0]))
+                board.draw_markers(raw)
+                self.frozen, self.choice = (raw, board, items), None
+                self.enter("robot")
                 self.log_camera(board)
-                self.frozen = frame.copy()
-                return self.enter("robot")
-        write(frame, lines, [self.message, "1-8: red/blue/green/yellow circle, square   ENTER: freeze   BACKSPACE: step 2   q: quit"])
+                for n, item in enumerate(items, 1):
+                    x, y, _ = self.robot_xy(item)
+                    log(f"  [{n}] {item['colour']} {item['shape']}: robot x = {x:.0f}  y = {y:.0f} mm")
+                return None
+        write(frame, lines, [self.message, "ENTER: freeze, then choose a number   BACKSPACE: step 2   q: quit"])
         return frame
+
+    @staticmethod
+    def robot_xy(item):
+        """(x, y, distance to the base) of an object, robot frame."""
+        x, y, _ = board_to_robot([[*item["XY"], 0]])[0]
+        return x, y, np.hypot(x, y)
 
     # ---- step 4
     def robot(self, frame, key):
-        frame = self.frozen.copy()
-        x, y = self.target
-        lines = ["4 ROBOT (frozen picture)", f"{self.name}: robot x = {x:.1f}  y = {y:.1f} mm",
-                 f"the tool will stop {self.args.hover:.0f} mm above the table (z = {TABLE_Z + self.args.hover:.0f})"]
+        picture, board, items = self.frozen
+        frame = picture.copy()
         if key in BACKSPACE:
             return self.enter("object")
+        if DIGITS.get(key, 99) <= len(items):
+            self.choice, self.message = DIGITS[key] - 1, ""
+            item = items[self.choice]
+            x, y, r = self.robot_xy(item)
+            log(f"chosen: [{self.choice + 1}] {item['colour']} {item['shape']}, pixel ({item['uv'][0]:.0f}, "
+                f"{item['uv'][1]:.0f}), board ({item['XY'][0]:.0f}, {item['XY'][1]:.0f}) mm, robot ({x:.1f}, {y:.1f}) mm")
+        for n, item in enumerate(items, 1):
+            label(frame, item, n, chosen=n - 1 == self.choice)
+        lines, goal = ["4 ROBOT (frozen picture): choose a number"], None
+        if self.choice is not None:
+            item = items[self.choice]
+            x, y, r = self.robot_xy(item)
+            board.draw_axes(frame, (x, y, TABLE_Z))
+            lines = [f"4 ROBOT: [{self.choice + 1}] {item['colour']} {item['shape']}",
+                     f"pixel ({item['uv'][0]:.0f}, {item['uv'][1]:.0f})   board X = {item['XY'][0]:.0f}  Y = {item['XY'][1]:.0f} mm",
+                     f"robot x = {x:.0f}  y = {y:.0f}  z = {TABLE_Z:.0f} mm   (tool: {self.args.hover:.0f} mm above the table)"]
+            if REACH[0] <= r <= REACH[1]:
+                goal = (x, y)
+            else:
+                lines.append(f"out of reach: {r:.0f} mm from the base")
         if key == ord("r") and self.arm is None:
             self.connect()
             return None
         if key == SPACE:
             if self.arm is None:
                 self.say("connect the arm first: r")
+            elif goal is None:
+                self.say("choose an object (within reach) first")
             else:
-                goal = self.target.copy()
                 log(f"going above ({goal[0]:.1f}, {goal[1]:.1f})")
-                self.step = "moving"
+                self.step, self.history = "moving", []
                 self.motion = Motion(lambda: go_above(self.arm, goal, self.args.hover))
                 return None
-        help_ = "SPACE: go above the target" if self.arm is not None else \
-            "arm in REST position, cell clear?   r: connect and home"
-        write(frame, lines, [self.message, help_ + "   BACKSPACE: step 3   q: quit"])
+        help_ = "SPACE: go above" if self.arm is not None else "arm in REST position, cell clear?   r: connect"
+        write(frame, lines, [self.message, f"1-{len(items)}: choose   {help_}   BACKSPACE: step 3   q: quit"])
         return frame
 
     def connect(self):
