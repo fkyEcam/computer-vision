@@ -1,4 +1,4 @@
-"""Cut-out sheets for the live robot cell of Lab 4, section 10 (PDF, 2 x A4 portrait, true scale).
+"""Cut-out sheets for the live robot cell of Lab 4 (PDF, 2 x A4 portrait, true scale).
 
 Page 1: the 4 ArUco markers (ids 0-3, 40 mm) as 60 mm tiles, and where to put them on the table.
 Page 2: circles (30 mm diameter) and squares (30 mm) in 4 colours, as 44 mm tiles.
@@ -104,7 +104,7 @@ def make():
                 ha="center", fontsize=9, weight="bold")
         layout_diagram(ax, 105 - 0.18 * LENGTH / 2, 93, 0.18)
         ax.text(15, 20, "Cut along the dashed lines (keep the white border). Marker 0 and 1 on the robot side, then "
-                        "clockwise seen from above.\nThe distances are entered in MARKERS_LIVE (Labs 4 and 8). "
+                        "clockwise seen from above.\nThe distances are entered in live_robot.py and in MARKERS_LIVE (Lab 8). "
                         "Tape the markers flat.", fontsize=7.5, va="center")
         pdf.savefig(fig)
         plt.close(fig)

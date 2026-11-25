@@ -1,4 +1,4 @@
-"""Printable calibration checkerboard for Lab 4, section 10 (vector PDF, A4 landscape, true scale).
+"""Printable calibration checkerboard for Lab 4 (vector PDF, A4 landscape, true scale).
 
 10 x 7 squares of 25 mm = 9 x 6 inner corners, as expected by capture_calibration.py and Lab 4.
 Print at 100 % on matt paper, check the 100 mm ruler, and glue the sheet flat on a rigid board.

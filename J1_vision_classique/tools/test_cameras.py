@@ -7,8 +7,8 @@
 In the preview, show the sheet notebooks/data/robot/aruco_markers_A4.png (printed at 100 %: 40 mm
 markers) flat in front of the camera, at the distance it will have above the table.
 
-The cameras are opened exactly as in the labs (DirectShow, 1280 x 720), so the index printed here
-is the one to use: CAMERA_INDEX (Lab 1), --camera / CAMERA_ID (Lab 4), CAMERA_ID (Lab 8).
+The cameras are opened exactly as in the labs (camera.py, 1280 x 720), so the index printed here
+is the one to use: CAMERA_INDEX (Lab 1), --camera (live_robot.py), CAMERA_ID (Lab 8).
 """
 import argparse
 import ctypes
@@ -20,6 +20,8 @@ import uuid
 os.environ.setdefault("OPENCV_LOG_LEVEL", "SILENT")
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
+
+import camera  # noqa: E402
 
 W, H = 1280, 720                 # image size used in Labs 1, 4 and 8
 MIN_FPS = 10                     # comfortable preview for capture_calibration.py
@@ -81,10 +83,7 @@ def directshow_names():
 
 
 def open_camera(index, size=(W, H)):
-    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, size[0])
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
-    return cap
+    return camera.open_camera(index, *size)
 
 
 def grab(cap, n, warmup=15):

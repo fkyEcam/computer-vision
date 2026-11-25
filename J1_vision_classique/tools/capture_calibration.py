@@ -1,6 +1,6 @@
-"""Capture checkerboard views for camera calibration (Lab 4, section 8).
+"""Capture checkerboard views for camera calibration (Lab 4, see live_robot.py).
 
-    python capture_calibration.py --camera 1 --out my_calib --pattern 9 6
+    python capture_calibration.py --out cell_calib --pattern 9 6
 
 Live preview; the detected corners are drawn in green when the full pattern is found.
   SPACE : save the current frame (only if the pattern is detected)
@@ -13,10 +13,12 @@ from pathlib import Path
 
 import cv2
 
+from camera import DEFAULT_CAMERA, open_camera
+
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--camera", type=int, default=1, help="camera index (0 = first camera)")
+    ap.add_argument("--camera", type=int, default=DEFAULT_CAMERA, help=f"camera index (default {DEFAULT_CAMERA})")
     ap.add_argument("--out", default="my_calib", help="output folder")
     ap.add_argument("--pattern", type=int, nargs=2, default=(9, 6), help="inner corners: columns rows")
     ap.add_argument("--width", type=int, default=1280)
@@ -25,9 +27,7 @@ def main():
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)  # DirectShow: faster start on Windows
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+    cap = open_camera(args.camera, args.width, args.height)
     cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)  # ignored by cameras without this control
     if not cap.isOpened():
         raise SystemExit(f"cannot open camera {args.camera}")
